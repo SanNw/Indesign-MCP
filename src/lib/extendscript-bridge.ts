@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { ScriptResult, InDesignEnv } from "./types.js";
+import { t } from "../i18n.js";
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_LANGUAGE_JAVASCRIPT = 1246973031;
@@ -55,7 +56,7 @@ export async function executeScript(
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $code = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:MCP_INDESIGN_SCRIPT))
 $type = [Type]::GetTypeFromProgID('InDesign.Application')
-if ($null -eq $type) { throw 'Adobe InDesign não registrado no COM' }
+if ($null -eq $type) { throw ${JSON.stringify(t("comNotRegistered"))} }
 $app = [Activator]::CreateInstance($type)
 try { $app.DoScript($code, ${SCRIPT_LANGUAGE_JAVASCRIPT}, @()) }
 finally { [Runtime.InteropServices.Marshal]::FinalReleaseComObject($app) | Out-Null }

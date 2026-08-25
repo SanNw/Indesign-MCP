@@ -14,6 +14,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { defaultEnv, executeScript, checkInDesignConnection } from "./lib/extendscript-bridge.js";
 import type { ScriptResult } from "./lib/types.js";
+import { language, t } from "./i18n.js";
 
 const jsxString = (value: string) => JSON.stringify(value);
 
@@ -24,7 +25,7 @@ const jsxString = (value: string) => JSON.stringify(value);
 const server = new McpServer({
   name: "indesign-mcp",
   version: "0.1.0",
-  description: "Control Adobe InDesign via ExtendScript bridge — export batch, text manipulation, document management",
+  description: t("serverDescription"),
 });
 
 // ========================================================================
@@ -43,7 +44,7 @@ async function runExtendScript(code: string): Promise<{ content: Array<{ type: "
         content: [
           {
             type: "text",
-            text: "Erro ao executar no InDesign: " + result.error,
+            text: t("executeError") + result.error,
           },
         ],
         isError: true,
@@ -51,8 +52,8 @@ async function runExtendScript(code: string): Promise<{ content: Array<{ type: "
     }
 
     const text = result.data !== undefined && result.data !== null
-      ? `✅ Sucesso!\n\n${JSON.stringify(result.data, null, 2)}`
-      : `✅ Concluído (sem dados de retorno)`;
+      ? `✅ ${t("success")}\n\n${JSON.stringify(result.data, null, 2)}`
+      : `✅ ${t("completed")}`;
 
     return {
       content: [{ type: "text", text }],
@@ -62,7 +63,7 @@ async function runExtendScript(code: string): Promise<{ content: Array<{ type: "
       content: [
         {
           type: "text",
-          text: `❌ Erro interno: ${String(e)}`,
+          text: `❌ ${t("internalError")}${String(e)}`,
         },
       ],
       isError: true,
@@ -76,7 +77,7 @@ async function runExtendScript(code: string): Promise<{ content: Array<{ type: "
 
 server.tool(
   "check_connection",
-  "Verifica se o Adobe InDesign está aberto e respondendo. Execute esta ferramenta antes de usar outras.",
+  t("check_connection"),
   {},
   async () => {
     const connected = await checkInDesignConnection(defaultEnv);
@@ -85,7 +86,7 @@ server.tool(
         content: [
           {
             type: "text",
-            text: "✅ Conectado ao Adobe InDesign!\n\nO InDesign está aberto e respondendo aos scripts ExtendScript. Você pode usar as outras ferramentas.",
+            text: `✅ ${t("connected")}`,
           },
         ],
       };
@@ -94,7 +95,7 @@ server.tool(
       content: [
         {
           type: "text",
-          text: `⚠️ InDesign não detectado ou não respondendo.\n\n1. Abra o Adobe InDesign no Windows\n2. Execute novamente esta ferramenta\n\nTempo limite por script: ${defaultEnv.timeoutMs}ms`,
+          text: `⚠️ ${t("notConnected", { timeout: defaultEnv.timeoutMs })}`,
         },
       ],
       isError: true,
@@ -108,7 +109,7 @@ server.tool(
 
 server.tool(
   "list_documents",
-  "Lista todos os documentos do InDesign que estão atualmente abertos.",
+  t("list_documents"),
   {},
   async () => {
     const code = `
@@ -136,15 +137,15 @@ docs;`;
 
 server.tool(
   "get_document_info",
-  "Obtém informações detalhadas de um documento do InDesign.",
+  t("get_document_info"),
   {
-    document: z.string().describe("Nome do documento (ex: 'meu_doc.indd') ou 'active' para o documento ativo"),
+    document: z.string().describe(t("document")),
   },
   async ({ document }) => {
     const code = `
 var doc;
 if (${document === "active" ? "true" : "false"}) {
-  if (app.documents.length === 0) { throw new Error("Nenhum documento aberto"); }
+  if (app.documents.length === 0) { throw new Error(${jsxString(t("noDocument"))}); }
   doc = app.documents[0];
 } else {
   var targetName = ${jsxString(document)};
@@ -152,7 +153,7 @@ if (${document === "active" ? "true" : "false"}) {
   for (var i = 0; i < app.documents.length; i++) {
     if (app.documents[i].name === targetName) { doc = app.documents[i]; break; }
   }
-  if (!doc) { throw new Error("Documento '" + targetName + "' não encontrado"); }
+  if (!doc) { throw new Error(${jsxString(t("documentNotFound"))} + ": " + targetName); }
 }
 
 var pages = [];
@@ -186,13 +187,13 @@ info;`;
 
 server.tool(
   "export_pdf",
-  "Exporta um ou todos os documentos abertos como PDF.",
+  t("export_pdf"),
   {
-    outputDir: z.string().describe("Pasta de destino para os arquivos PDF"),
-    document: z.string().optional().describe("'active' para apenas o doc ativo, 'all' para todos, ou nome específico"),
-    pdfPreset: z.string().optional().describe("Nome do preset PDF (ex: '[High Quality Print]', '[Smallest File Size]')"),
-    pageRange: z.string().optional().describe("Intervalo de páginas (ex: '1-5,8,10-12'). Opcional."),
-    overwrite: z.boolean().optional().describe("Sobrescrever arquivos existentes"),
+    outputDir: z.string().describe(t("outputPdf")),
+    document: z.string().optional().describe(t("documentScope")),
+    pdfPreset: z.string().optional().describe(t("pdfPreset")),
+    pageRange: z.string().optional().describe(t("pageRange")),
+    overwrite: z.boolean().optional().describe(t("overwrite")),
   },
   async ({ outputDir, document = "active", pdfPreset = "[High Quality Print]", pageRange, overwrite = false }) => {
     const code = `
@@ -207,7 +208,7 @@ function exportDoc(doc) {
   var outFile = new File(outputDir + "/" + name + ".pdf");
 
   if (outFile.exists && !overwrite) {
-    return { skipped: true, file: name + ".pdf", reason: "já existe" };
+    return { skipped: true, file: name + ".pdf", reason: ${jsxString(t("alreadyExists"))} };
   }
 
   var preset = app.pdfExportPresets.itemByName(presetName);
@@ -224,7 +225,7 @@ function exportDoc(doc) {
 
 var results = [];
 if (docName === "active") {
-  if (app.documents.length === 0) throw new Error("Nenhum documento aberto");
+  if (app.documents.length === 0) throw new Error(${jsxString(t("noDocument"))});
   results.push(exportDoc(app.documents[0]));
 } else if (docName === "all") {
   for (var i = 0; i < app.documents.length; i++) {
@@ -238,7 +239,7 @@ if (docName === "active") {
       found = true; break;
     }
   }
-  if (!found) throw new Error("Documento '" + docName + "' não encontrado");
+  if (!found) throw new Error(${jsxString(t("documentNotFound"))} + ": " + docName);
 }
 results;`;
 
@@ -252,15 +253,15 @@ results;`;
 
 server.tool(
   "export_image",
-  "Exporta páginas de documentos como imagens JPG, PNG ou TIFF.",
+  t("export_image"),
   {
-    outputDir: z.string().describe("Pasta de destino"),
-    format: z.enum(["JPG", "PNG", "TIFF"]).describe("Formato de imagem"),
-    document: z.string().optional().describe("'active', 'all' ou nome específico"),
-    pageRange: z.string().optional().describe("Intervalo de páginas (ex: '1-3,5')"),
-    resolution: z.number().int().min(72).max(1200).optional().describe("Resolução em DPI"),
-    quality: z.number().int().min(1).max(4).optional().describe("Qualidade JPG (1=Máx, 4=Baixa)"),
-    overwrite: z.boolean().optional().describe("Sobrescrever existentes"),
+    outputDir: z.string().describe(t("outputDir")),
+    format: z.enum(["JPG", "PNG", "TIFF"]).describe(t("imageFormat")),
+    document: z.string().optional().describe(t("shortDocumentScope")),
+    pageRange: z.string().optional().describe(t("imagePageRange")),
+    resolution: z.number().int().min(72).max(1200).optional().describe(t("resolution")),
+    quality: z.number().int().min(1).max(4).optional().describe(t("quality")),
+    overwrite: z.boolean().optional().describe(t("overwrite")),
   },
   async ({ outputDir, format, document = "active", pageRange, resolution = 300, quality = 3, overwrite = false }) => {
     const fmtConst = format === "JPG" ? "JPG" : format === "PNG" ? "PNG" : "TIFF";
@@ -328,7 +329,7 @@ function exportPage(doc, page, idx) {
 var results = [];
 var docs = [];
 if (docName === "active") {
-  if (app.documents.length === 0) throw new Error("Nenhum documento aberto");
+  if (app.documents.length === 0) throw new Error(${jsxString(t("noDocument"))});
     docs.push(app.documents[0]);
 } else if (docName === "all") {
   for (var i = 0; i < app.documents.length; i++) docs.push(app.documents[i]);
@@ -336,7 +337,7 @@ if (docName === "active") {
   for (var i = 0; i < app.documents.length; i++) {
     if (app.documents[i].name === docName) { docs.push(app.documents[i]); break; }
   }
-  if (docs.length === 0) throw new Error("Documento '" + docName + "' não encontrado");
+  if (docs.length === 0) throw new Error(${jsxString(t("documentNotFound"))} + ": " + docName);
 }
 
 for (var d = 0; d < docs.length; d++) {
@@ -357,19 +358,19 @@ results;`;
 
 server.tool(
   "batch_export",
-  "Executa a exportação em lote usando o script BatchExportProfessional.jsx existente. Ideal para exportar múltiplos formatos de uma vez.",
+  t("batch_export"),
   {
-    outputDir: z.string().describe("Pasta de destino para todos os arquivos"),
-    formats: z.array(z.enum(["pdf", "jpg", "png", "tiff", "eps", "epub", "idml", "html"])).describe("Formatos a exportar"),
-    document: z.enum(["active", "all"]).describe("Escopo: 'active' (apenas doc ativo) ou 'all' (todos os abertos)"),
-    pageRange: z.string().optional().describe("Intervalo de páginas para imagens (ex: '1-5,8')"),
-    pdfPreset: z.string().optional().describe("Preset PDF a usar"),
-    jpgQuality: z.number().int().min(1).max(4).optional().describe("Qualidade JPG (1-4)"),
-    resolution: z.number().int().min(72).max(1200).optional().describe("Resolução DPI para imagens"),
-    overwrite: z.boolean().optional().describe("Sobrescrever arquivos existentes"),
-    enableLogging: z.boolean().optional().describe("Salvar log em arquivo"),
-    openAfter: z.boolean().optional().describe("Abrir pasta após exportação"),
-    useBatchScript: z.boolean().optional().describe("Se true, usa BatchExportProfessional.jsx diretamente. Se false, gera ExtendScript dinâmico."),
+    outputDir: z.string().describe(t("outputDir")),
+    formats: z.array(z.enum(["pdf", "jpg", "png", "tiff", "eps", "epub", "idml", "html"])).describe(t("formats")),
+    document: z.enum(["active", "all"]).describe(t("activeAllScope")),
+    pageRange: z.string().optional().describe(t("imagePageRange")),
+    pdfPreset: z.string().optional().describe(t("pdfPreset")),
+    jpgQuality: z.number().int().min(1).max(4).optional().describe(t("jpgQuality")),
+    resolution: z.number().int().min(72).max(1200).optional().describe(t("imageResolution")),
+    overwrite: z.boolean().optional().describe(t("overwrite")),
+    enableLogging: z.boolean().optional().describe(t("enableLogging")),
+    openAfter: z.boolean().optional().describe(t("openAfter")),
+    useBatchScript: z.boolean().optional().describe(t("useBatchScript")),
   },
   async ({
     outputDir,
@@ -389,7 +390,7 @@ server.tool(
       const batchScriptPath = process.env.INDESIGN_MCP_BATCH_SCRIPT;
       if (!batchScriptPath) {
         return {
-          content: [{ type: "text", text: "Defina INDESIGN_MCP_BATCH_SCRIPT com o caminho do BatchExportProfessional.jsx ou use useBatchScript=false." }],
+          content: [{ type: "text", text: t("batchEnvMissing") }],
           isError: true,
         };
       }
@@ -399,7 +400,7 @@ server.tool(
       const code = `
 // Wrapper para invocar BatchExportProfessional.jsx
 var batchPath = new File(${jsxString(batchJsx)});
-if (!batchPath.exists) throw new Error("BatchExportProfessional.jsx não encontrado: " + batchPath.fsName);
+if (!batchPath.exists) throw new Error(${jsxString(t("batchNotFound"))} + batchPath.fsName);
 
 // Configura variáveis globais esperadas pelo script
 var config = {
@@ -431,7 +432,7 @@ var config = {
 app.doScript(batchPath, undefined, undefined, UndefinedConstant.UNDEFINED, false);
 
 // O script batch salva resultados via app.storeLabel, lemos aqui
-var result = app.extractLabel("batchExportResult") || "Exportação concluída (sem retorno detalhado)";
+var result = app.extractLabel("batchExportResult") || ${jsxString(t("batchDone"))};
 result;`;
 
       return runExtendScript(code);
@@ -496,7 +497,7 @@ var formats = ${JSON.stringify(formats)};
 var results = [];
 var docs = getDocs();
 
-if (docs.length === 0) throw new Error("Nenhum documento para exportar");
+if (docs.length === 0) throw new Error(${jsxString(t("noDocumentExport"))});
 
 for (var d = 0; d < docs.length; d++) {
   var doc = docs[d];
@@ -587,25 +588,25 @@ results;`;
 
 server.tool(
   "get_text",
-  "Lê texto de frames, parágrafos ou páginas do documento ativo.",
+  t("get_text"),
   {
-    target: z.enum(["selection", "page", "document", "frame"]).describe("O que ler: seleção atual, página inteira, documento todo ou frame específico"),
-    page: z.number().int().positive().optional().describe("Número da página (quando target='page')"),
-    frameIndex: z.number().int().nonnegative().optional().describe("Índice do frame na página (quando target='frame')"),
+    target: z.enum(["selection", "page", "document", "frame"]).describe(t("readTarget")),
+    page: z.number().int().positive().optional().describe(t("targetPage")),
+    frameIndex: z.number().int().nonnegative().optional().describe(t("targetFrame")),
   },
   async ({ target, page, frameIndex }) => {
     let code: string;
 
     if (target === "selection") {
       code = `
-if (app.selection.length === 0) throw new Error("Nenhuma seleção");
+if (app.selection.length === 0) throw new Error(${jsxString(t("noSelection"))});
 var texts = [];
 for (var i = 0; i < app.selection.length; i++) {
   var sel = app.selection[i];
   if (sel.hasOwnProperty("contents")) {
     texts.push({ type: sel.constructor.name, text: sel.contents.toString() });
   } else {
-    texts.push({ type: sel.constructor.name, text: "(objeto sem conteúdo de texto)" });
+    texts.push({ type: sel.constructor.name, text: ${jsxString(t("noText"))} });
   }
 }
 texts;`;
@@ -639,7 +640,7 @@ result;`;
 var doc = app.documents[0];
 var page = doc.pages[0];
 var frames = page.textFrames;
-if (${idx} >= frames.length) throw new Error("Frame de índice ${idx} não encontrado (máximo: " + (frames.length - 1) + ")");
+if (${idx} >= frames.length) throw new Error(${jsxString(t("frameNotFound"))} + ": ${idx} (" + ${jsxString(t("maximum"))} + ": " + (frames.length - 1) + ")");
 var frame = frames[${idx}];
 { text: frame.contents.toString(), geometricBounds: frame.geometricBounds.toString() };`;
     }
@@ -654,19 +655,19 @@ var frame = frames[${idx}];
 
 server.tool(
   "insert_text",
-  "Insere texto em um frame de texto no documento ativo.",
+  t("insert_text"),
   {
-    text: z.string().describe("Texto a inserir"),
-    frameIndex: z.number().int().nonnegative().default(0).describe("Índice do frame de texto (0 = primeiro)"),
-    page: z.number().int().positive().default(1).describe("Número da página"),
-    append: z.boolean().default(false).describe("Se true, anexa ao texto existente em vez de substituir"),
+    text: z.string().describe(t("textInsert")),
+    frameIndex: z.number().int().nonnegative().default(0).describe(t("frameIndex")),
+    page: z.number().int().positive().default(1).describe(t("pageNumber")),
+    append: z.boolean().default(false).describe(t("append")),
   },
   async ({ text, frameIndex, page, append }) => {
     const code = `
 var doc = app.documents[0];
 var page = doc.pages[${page - 1}];
 var frames = page.textFrames;
-if (${frameIndex} >= frames.length) throw new Error("Frame de índice ${frameIndex} não encontrado na página ${page}");
+if (${frameIndex} >= frames.length) throw new Error(${jsxString(t("frameNotFound"))} + ": ${frameIndex}, " + ${jsxString(t("pageLabel"))} + " ${page}");
 
 var frame = frames[${frameIndex}];
 var texto = ${JSON.stringify(text)};
@@ -689,13 +690,13 @@ if (${append}) {
 
 server.tool(
   "replace_text",
-  "Substitui texto no documento ativo.",
+  t("replace_text"),
   {
-    search: z.string().describe("Texto a ser substituído"),
-    replace: z.string().describe("Texto de substituição"),
-    scope: z.enum(["document", "selection"]).default("document").describe("Escopo da substituição"),
-    caseSensitive: z.boolean().default(false).describe("Diferenciar maiúsculas/minúsculas"),
-    wholeWord: z.boolean().default(false).describe("Correspondência de palavra inteira"),
+    search: z.string().describe(t("search")),
+    replace: z.string().describe(t("replace")),
+    scope: z.enum(["document", "selection"]).default("document").describe(t("replaceScope")),
+    caseSensitive: z.boolean().default(false).describe(t("caseSensitive")),
+    wholeWord: z.boolean().default(false).describe(t("wholeWord")),
   },
   async ({ search, replace, scope, caseSensitive, wholeWord }) => {
     const code = `
@@ -731,15 +732,15 @@ for (var i = 0; i < found.length; i++) {
 
 server.tool(
   "run_jsx",
-  "Executa um código ExtendScript arbitrário no InDesign. Use para automações personalizadas não cobertas por outras tools.",
+  t("run_jsx"),
   {
-    code: z.string().describe("Código ExtendScript (JavaScript) a ser executado no InDesign. Atenção: execute apenas código confiável."),
-    waitForResult: z.boolean().default(true).describe("Se true, aguarda o resultado (até timeout). Se false, executa e retorna imediatamente."),
+    code: z.string().describe(t("jsxCode")),
+    waitForResult: z.boolean().default(true).describe(t("waitForResult")),
   },
   async ({ code, waitForResult }) => {
     if (process.env.INDESIGN_MCP_ENABLE_RUN_JSX !== "1") {
       return {
-        content: [{ type: "text", text: "run_jsx está desabilitado. Defina INDESIGN_MCP_ENABLE_RUN_JSX=1 para permitir execução arbitrária." }],
+        content: [{ type: "text", text: t("jsxDisabled") }],
         isError: true,
       };
     }
@@ -753,10 +754,10 @@ server.tool(
 
 server.tool(
   "list_frames",
-  "Lista todos os frames de texto em uma página ou documento.",
+  t("list_frames"),
   {
-    scope: z.enum(["page", "document", "selection"]).default("page").describe("Escopo da listagem"),
-    page: z.number().int().positive().default(1).describe("Número da página (quando scope='page')"),
+    scope: z.enum(["page", "document", "selection"]).default("page").describe(t("listScope")),
+    page: z.number().int().positive().default(1).describe(t("scopePage")),
   },
   async ({ scope, page }) => {
     let code: string;
@@ -778,7 +779,7 @@ for (var i = 0; i < frames.length; i++) {
 result;`;
     } else if (scope === "selection") {
       code = `
-if (app.selection.length === 0) throw new Error("Nenhuma seleção");
+if (app.selection.length === 0) throw new Error(${jsxString(t("noSelection"))});
 var sel = app.selection[0];
 if (sel.hasOwnProperty("textFrames")) {
   var frames = sel.textFrames;
@@ -788,7 +789,7 @@ if (sel.hasOwnProperty("textFrames")) {
   }
   result;
 } else {
-  [{ type: sel.constructor.name, text: sel.contents ? sel.contents.toString().slice(0, 200) : "(sem texto)" }];
+  [{ type: sel.constructor.name, text: sel.contents ? sel.contents.toString().slice(0, 200) : ${jsxString(t("noTextShort"))} }];
 }`;
     } else {
       code = `
@@ -817,19 +818,19 @@ result;`;
 
 server.tool(
   "set_frame_text",
-  "Define ou anexa texto a um frame de texto específico.",
+  t("set_frame_text"),
   {
-    text: z.string().describe("Texto a inserir"),
-    page: z.number().int().positive().default(1).describe("Número da página"),
-    frameIndex: z.number().int().nonnegative().default(0).describe("Índice do frame na página"),
-    mode: z.enum(["replace", "append", "prepend"]).default("replace").describe("Modo de inserção"),
+    text: z.string().describe(t("textInsert")),
+    page: z.number().int().positive().default(1).describe(t("pageNumber")),
+    frameIndex: z.number().int().nonnegative().default(0).describe(t("frameOnPage")),
+    mode: z.enum(["replace", "append", "prepend"]).default("replace").describe(t("insertionMode")),
   },
   async ({ text, page, frameIndex, mode }) => {
     const code = `
 var doc = app.documents[0];
 var page = doc.pages[${page - 1}];
 var frames = page.textFrames;
-if (${frameIndex} >= frames.length) throw new Error("Frame ${frameIndex} não encontrado na página ${page} (máximo: " + (frames.length - 1) + ")");
+if (${frameIndex} >= frames.length) throw new Error(${jsxString(t("frameNotFound"))} + ": ${frameIndex}, " + ${jsxString(t("pageLabel"))} + " ${page} (" + ${jsxString(t("maximum"))} + ": " + (frames.length - 1) + ")");
 
 var frame = frames[${frameIndex}];
 var texto = ${JSON.stringify(text)};
@@ -854,9 +855,9 @@ if ("${mode}" === "replace") {
 
 server.tool(
   "list_styles",
-  "Lista estilos de parágrafo, caracteres e outros no documento ativo.",
+  t("list_styles"),
   {
-    styleType: z.enum(["paragraph", "character", "object", "table", "cell"]).default("paragraph").describe("Tipo de estilo"),
+    styleType: z.enum(["paragraph", "character", "object", "table", "cell"]).default("paragraph").describe(t("styleType")),
   },
   async ({ styleType }) => {
     const typeMap = {
@@ -886,13 +887,13 @@ result;`;
 
 server.tool(
   "apply_style",
-  "Aplica um estilo de parágrafo ou caractere a texto selecionado ou a um frame.",
+  t("apply_style"),
   {
-    styleName: z.string().describe("Nome do estilo a aplicar"),
-    styleType: z.enum(["paragraph", "character"]).default("paragraph").describe("Tipo de estilo"),
-    target: z.enum(["selection", "frame"]).default("selection").describe("Alvo: seleção atual ou frame"),
-    page: z.number().int().positive().default(1).describe("Página do frame (quando target='frame')"),
-    frameIndex: z.number().int().nonnegative().default(0).describe("Índice do frame (quando target='frame')"),
+    styleName: z.string().describe(t("styleName")),
+    styleType: z.enum(["paragraph", "character"]).default("paragraph").describe(t("styleType")),
+    target: z.enum(["selection", "frame"]).default("selection").describe(t("styleTarget")),
+    page: z.number().int().positive().default(1).describe(t("framePage")),
+    frameIndex: z.number().int().nonnegative().default(0).describe(t("targetFrameIndex")),
   },
   async ({ styleName, styleType, target, page, frameIndex }) => {
     const prop = styleType === "paragraph" ? "paragraphStyles" : "characterStyles";
@@ -908,16 +909,16 @@ var styles = doc.${prop};
 for (var i = 0; i < styles.length; i++) {
   if (styles[i].name === styleName) { style = styles[i]; break; }
 }
-if (!style) throw new Error("Estilo '" + styleName + "' não encontrado");
+if (!style) throw new Error(${jsxString(t("styleNotFound"))} + ": " + styleName);
 
 if ("${target}" === "selection") {
-  if (app.selection.length === 0) throw new Error("Nenhuma seleção para aplicar estilo");
+  if (app.selection.length === 0) throw new Error(${jsxString(t("noStyleSelection"))});
   app.selection[0].${applyMethod} = style;
   { applied: true, style: styleName, target: "selection" };
 } else {
   var page = doc.pages[${page - 1}];
   var frames = page.textFrames;
-  if (${frameIndex} >= frames.length) throw new Error("Frame não encontrado");
+  if (${frameIndex} >= frames.length) throw new Error(${jsxString(t("frameNotFound"))});
   frames[${frameIndex}].${applyMethod} = style;
   { applied: true, style: styleName, target: "frame", page: ${page}, frameIndex: ${frameIndex} };
 }`;
@@ -932,9 +933,9 @@ if ("${target}" === "selection") {
 
 server.tool(
   "list_colors",
-  "Lista todas as cores e tintas (swatches) no documento ativo.",
+  t("list_colors"),
   {
-    swatchType: z.enum(["color", "gradient", "tint", "all"]).default("color").describe("Tipo de swatch"),
+    swatchType: z.enum(["color", "gradient", "tint", "all"]).default("color").describe(t("swatchType")),
   },
   async ({ swatchType }) => {
     const code = `
@@ -958,12 +959,12 @@ result;`;
 
 server.tool(
   "create_color_swatch",
-  "Cria uma nova cor (swatch) no documento ativo.",
+  t("create_color_swatch"),
   {
-    name: z.string().describe("Nome da cor"),
-    model: z.enum(["process", "spot"]).default("process").describe("Modelo de cor"),
-    colorSpace: z.enum(["RGB", "CMYK", "LAB", "GRAY"]).default("RGB").describe("Espaço de cor"),
-    values: z.array(z.number()).describe("Valores da cor (ex: [255, 0, 0] para RGB vermelho)"),
+    name: z.string().describe(t("colorName")),
+    model: z.enum(["process", "spot"]).default("process").describe(t("colorModel")),
+    colorSpace: z.enum(["RGB", "CMYK", "LAB", "GRAY"]).default("RGB").describe(t("colorSpace")),
+    values: z.array(z.number()).describe(t("colorValues")),
   },
   async ({ name, model, colorSpace, values }) => {
     const code = `
@@ -977,7 +978,7 @@ try {
   });
   { created: true, name: color.name, model: color.model.toString(), space: color.space.toString() };
 } catch(e) {
-  throw new Error("Falha ao criar cor: " + String(e));
+  throw new Error(${jsxString(t("colorFailed"))} + String(e));
 }`;
 
     return runExtendScript(code);
@@ -990,9 +991,9 @@ try {
 
 server.tool(
   "get_page_info",
-  "Obtém informações detalhadas de uma página específica.",
+  t("get_page_info"),
   {
-    page: z.number().int().positive().default(1).describe("Número da página"),
+    page: z.number().int().positive().default(1).describe(t("pageNumber")),
   },
   async ({ page }) => {
     const code = `
@@ -1027,11 +1028,11 @@ result;`;
 
 server.tool(
   "create_text_frame",
-  "Cria um novo frame de texto em uma página com as dimensões especificadas.",
+  t("create_text_frame"),
   {
-    text: z.string().optional().describe("Texto inicial do frame"),
-    page: z.number().int().positive().default(1).describe("Número da página"),
-    geometricBounds: z.array(z.number()).length(4).describe("Limites [topo, esquerda, fundo, direita] em pontos"),
+    text: z.string().optional().describe(t("initialText")),
+    page: z.number().int().positive().default(1).describe(t("pageNumber")),
+    geometricBounds: z.array(z.number()).length(4).describe(t("bounds")),
   },
   async ({ text, page, geometricBounds }) => {
     const bounds = JSON.stringify(geometricBounds);
@@ -1057,13 +1058,13 @@ if (${textContent} !== null) {
 
 server.tool(
   "quick_export",
-  "Exporta o documento ativo rapidamente para um formato específico.",
+  t("quick_export"),
   {
-    format: z.enum(["pdf", "jpg", "png", "tiff", "eps", "epub", "idml", "html"]).describe("Formato de exportação"),
-    outputPath: z.string().describe("Caminho completo do arquivo de saída"),
-    pdfPreset: z.string().optional().describe("Preset PDF (apenas para PDF)"),
-    resolution: z.number().int().min(72).max(1200).default(300).describe("Resolução DPI (imagens)"),
-    pageRange: z.string().optional().describe("Intervalo de páginas (imagens)"),
+    format: z.enum(["pdf", "jpg", "png", "tiff", "eps", "epub", "idml", "html"]).describe(t("exportFormat")),
+    outputPath: z.string().describe(t("outputPath")),
+    pdfPreset: z.string().optional().describe(t("pdfOnlyPreset")),
+    resolution: z.number().int().min(72).max(1200).default(300).describe(t("imageOnlyResolution")),
+    pageRange: z.string().optional().describe(t("imageOnlyRange")),
   },
   async ({ format, outputPath, pdfPreset, resolution, pageRange }) => {
     const fmtMap: Record<string, string> = {
@@ -1132,12 +1133,12 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  console.error("[indesign-mcp] Servidor pronto. Aguardando conexões...");
-  console.error("[indesign-mcp] Timeout:", defaultEnv.timeoutMs + "ms");
-  console.error("[indesign-mcp] Plataforma:", process.platform);
+  console.error("[indesign-mcp]", t("ready"));
+  console.error("[indesign-mcp]", t("timeout"), defaultEnv.timeoutMs + "ms");
+  console.error("[indesign-mcp]", t("platform"), process.platform, `(${language})`);
 }
 
 main().catch((err) => {
-  console.error("[indesign-mcp] Erro fatal:", err);
+  console.error("[indesign-mcp]", t("fatal"), err);
   process.exit(1);
 });

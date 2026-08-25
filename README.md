@@ -9,36 +9,38 @@
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=for-the-badge&logo=windows11)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/npm/l/mcp-indesign?style=for-the-badge&color=2ea44f)](LICENSE)
 
-**Controle o Adobe InDesign diretamente pelo Codex, Claude, OpenCode e outros clientes MCP.**
+English | [Português](https://github.com/SanNw/Indesign-MCP/blob/main/README.pt-BR.md) | [Español](https://github.com/SanNw/Indesign-MCP/blob/main/README.es.md)
 
-[Instalação](#-instalação-pelo-npm) · [Ferramentas](#-ferramentas) · [Segurança](#-segurança) · [Desenvolvimento](#-desenvolvimento)
+**Control Adobe InDesign directly from Codex, Claude, OpenCode, and other MCP clients.**
+
+[Installation](#-npm-installation) · [Tools](#-tools) · [Security](#-security) · [Development](#-development)
 
 </div>
 
 ---
 
-O **InDesign MCP** é um servidor [Model Context Protocol](https://modelcontextprotocol.io/) que automatiza o Adobe InDesign no Windows por meio de COM e ExtendScript. Ele permite que assistentes de IA consultem documentos, editem conteúdo e executem exportações usando ferramentas estruturadas.
+**InDesign MCP** is a [Model Context Protocol](https://modelcontextprotocol.io/) server that automates Adobe InDesign on Windows through COM and ExtendScript. It enables AI assistants to inspect documents, edit content, and perform exports using structured tools.
 
-## ✨ Destaques
+## ✨ Highlights
 
-- **19 ferramentas** prontas para edição, inspeção e exportação.
-- **Instalação por npm**, sem plugin ou script de inicialização no InDesign.
-- **Integração nativa** com Codex, Claude Desktop, Claude Code e OpenCode.
-- **Execução local** por `stdio`; seus documentos não são enviados pelo MCP.
-- **Modo seguro por padrão**, com execução arbitrária de JSX desabilitada.
+- **19 tools** ready for editing, inspection, and export.
+- **npm installation**, with no InDesign plugin or startup script required.
+- **Native integration** with Codex, Claude Desktop, Claude Code, and OpenCode.
+- **Local execution** over `stdio`; your documents are not sent through MCP.
+- **Secure by default**, with arbitrary JSX execution disabled.
 
-## 📋 Requisitos
+## 📋 Requirements
 
-- Windows 10 ou 11
-- Adobe InDesign 2024 ou mais recente
-- Node.js 18 ou mais recente
-- PowerShell 5.1 ou mais recente
+- Windows 10 or 11
+- Adobe InDesign 2024 or later
+- Node.js 18 or later
+- PowerShell 5.1 or later
 
-O InDesign deve estar aberto durante o uso. Nenhum script de inicialização ou ajuste de firewall é necessário.
+InDesign must be open while the server is in use. No startup script or firewall configuration is required.
 
-## 📦 Instalação pelo npm
+## 📦 npm Installation
 
-Não é necessário clonar o repositório nem instalar o pacote globalmente. Configure seu cliente MCP para executar:
+You do not need to clone the repository or install the package globally. Configure your MCP client to run:
 
 ```powershell
 npx -y mcp-indesign
@@ -46,23 +48,27 @@ npx -y mcp-indesign
 
 ### Codex
 
-Adicione a `~/.codex/config.toml`:
+Add the following to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.indesign]
 command = "npx"
 args = ["-y", "mcp-indesign"]
 startup_timeout_sec = 30
+
+[mcp_servers.indesign.env]
+INDESIGN_MCP_LANGUAGE = "en"
 ```
 
-### Claude Desktop ou Claude Code
+### Claude Desktop or Claude Code
 
 ```json
 {
   "mcpServers": {
     "indesign": {
       "command": "npx",
-      "args": ["-y", "mcp-indesign"]
+      "args": ["-y", "mcp-indesign"],
+      "env": { "INDESIGN_MCP_LANGUAGE": "en" }
     }
   }
 }
@@ -77,53 +83,62 @@ startup_timeout_sec = 30
     "indesign": {
       "type": "local",
       "command": ["npx", "-y", "mcp-indesign"],
+      "environment": { "INDESIGN_MCP_LANGUAGE": "en" },
       "enabled": true
     }
   }
 }
 ```
 
-Reinicie o cliente, abra o InDesign e execute `check_connection`.
+Restart the client, open InDesign, and run `check_connection`.
 
-## 🧰 Ferramentas
+## 🧰 Tools
 
-| Ferramenta | Função |
+| Tool | Function |
 | --- | --- |
-| `check_connection` | Verifica a comunicação com o InDesign |
-| `list_documents` | Lista documentos abertos |
-| `get_document_info` | Retorna páginas e propriedades do documento |
-| `get_page_info` | Retorna informações de uma página |
-| `get_text` | Lê texto da seleção, página, documento ou frame |
-| `insert_text` | Insere texto em um frame |
-| `set_frame_text` | Substitui, acrescenta ou prefixa texto |
-| `replace_text` | Localiza e substitui texto |
-| `list_frames` | Lista frames de texto |
-| `create_text_frame` | Cria um frame de texto |
-| `list_styles` | Lista estilos do documento |
-| `apply_style` | Aplica estilos à seleção ou a um frame |
-| `list_colors` | Lista amostras de cor |
-| `create_color_swatch` | Cria uma amostra RGB, CMYK, LAB ou GRAY |
-| `export_pdf` | Exporta PDF |
-| `export_image` | Exporta JPG, PNG ou TIFF |
-| `quick_export` | Exporta rapidamente para um formato escolhido |
-| `batch_export` | Exporta múltiplos documentos e formatos |
-| `run_jsx` | Executa ExtendScript quando habilitado explicitamente |
+| `check_connection` | Checks communication with InDesign |
+| `list_documents` | Lists open documents |
+| `get_document_info` | Returns document pages and properties |
+| `get_page_info` | Returns information about a page |
+| `get_text` | Reads text from the selection, page, document, or frame |
+| `insert_text` | Inserts text into a frame |
+| `set_frame_text` | Replaces, appends, or prepends text |
+| `replace_text` | Finds and replaces text |
+| `list_frames` | Lists text frames |
+| `create_text_frame` | Creates a text frame |
+| `list_styles` | Lists document styles |
+| `apply_style` | Applies styles to the selection or a frame |
+| `list_colors` | Lists color swatches |
+| `create_color_swatch` | Creates an RGB, CMYK, LAB, or GRAY swatch |
+| `export_pdf` | Exports a PDF |
+| `export_image` | Exports a JPG, PNG, or TIFF image |
+| `quick_export` | Quickly exports to a selected format |
+| `batch_export` | Exports multiple documents and formats |
+| `run_jsx` | Runs ExtendScript when explicitly enabled |
 
-## 🔐 Segurança
+## 🔐 Security
 
-`run_jsx` permite execução arbitrária de ExtendScript e fica desabilitado por padrão. Habilite somente em ambientes confiáveis:
+The runtime defaults to English. Set the interface language in your MCP environment when needed:
+
+```text
+INDESIGN_MCP_LANGUAGE=en     # English
+INDESIGN_MCP_LANGUAGE=pt-BR  # Portuguese (pt and pt-PT are also accepted)
+INDESIGN_MCP_LANGUAGE=es     # Spanish
+```
+
+`run_jsx` allows arbitrary ExtendScript execution and is disabled by default. Enable it only in trusted environments:
 
 ```text
 INDESIGN_MCP_ENABLE_RUN_JSX=1
 ```
 
-Para usar uma instalação externa do `BatchExportProfessional.jsx`:
+To use an external installation of `BatchExportProfessional.jsx`:
 
 ```text
-INDESIGN_MCP_BATCH_SCRIPT=C:\caminho\BatchExportProfessional.jsx
+INDESIGN_MCP_BATCH_SCRIPT=C:\path\BatchExportProfessional.jsx
 ```
 
-## 🛠️ Desenvolvimento
+## 🛠️ Development
 
 ```powershell
 git clone https://github.com/SanNw/Indesign-MCP.git
@@ -132,28 +147,28 @@ npm install
 npm test
 ```
 
-O teste inicia o servidor, valida as 19 ferramentas e confirma que `run_jsx` permanece bloqueado por padrão.
+The test starts the server, validates all 19 tools, and confirms that `run_jsx` remains blocked by default.
 
-## 🩺 Solução de problemas
+## 🩺 Troubleshooting
 
-- Execute `check_connection` antes das outras ferramentas.
-- Confirme que o InDesign está aberto na mesma sessão do Windows.
-- Reinicie o cliente MCP depois de alterar a configuração.
-- Presets de exportação variam conforme a versão e o idioma do InDesign.
+- Run `check_connection` before using the other tools.
+- Confirm that InDesign is open in the same Windows session.
+- Restart the MCP client after changing its configuration.
+- Export presets vary by InDesign version and language.
 
-## ⚠️ Limitações
+## ⚠️ Limitations
 
-- A série `0.1.x` suporta somente Windows.
-- Operações podem modificar o documento aberto, mas não o salvam automaticamente.
-- A compatibilidade foi validada diretamente com o InDesign 2025; outras versões devem ser testadas pela comunidade.
+- The `0.1.x` series supports Windows only.
+- Operations may modify the open document but do not save it automatically.
+- Compatibility has been directly validated with InDesign 2025; other versions should be tested by the community.
 
-## 📄 Licença
+## 📄 License
 
 [MIT](LICENSE)
 
 <div align="center">
 
-Feito para aproximar inteligência artificial e design editorial.
+Built to bring artificial intelligence and editorial design closer together.
 
 ![Footer](https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=12,14,18&height=110&section=footer)
 
